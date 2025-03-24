@@ -1,0 +1,47 @@
+function X = bartels_stewart(A, B, C)
+    % Solves the Sylvester equation AX + XB = C using the Bartels-Stewart algorithm.
+    % Inputs:
+    %   A - m x m matrix
+    %   B - n x n matrix
+    %   C - m x n matrix
+    % Output:
+    %   X - m x n solution matrix
+
+    % Step 1: Compute Schur decompositions of A and B
+    [QA, TA] = schur(A, 'complex'); % Schur decomposition of A: A = QA * TA * QA'
+    [QB, TB] = schur(B', 'complex'); % Schur decomposition of B^T: B^T = QB * TB * QB'
+
+    % Step 2: Transform the Sylvester equation
+    D = QA' * C * QB; % Transform C to the new basis: D = QA' * C * QB
+
+    % Step 3: Solve the transformed equation T_A Y + Y T_B' = D
+    % Note: TB is already upper triangular, so we solve column by column
+    [m, n] = size(D);
+    Y = zeros(m, n); % Initialize Y
+
+    % Solve the triangular system column by column
+    for j = 1:n
+        for i = 1:m
+            % Compute the diagonal term
+            diag_term = TA(i, i) + TB(j, j);
+            if abs(diag_term) < eps
+                error('Diagonal term is zero. The Sylvester equation may not have a unique solution.');
+            end
+            
+            % Compute the right-hand side for this entry
+            rhs = D(i, j);
+            if i > 1
+                rhs = rhs - TA(i, 1:i-1) * Y(1:i-1, j); % Subtract contributions from previous rows
+            end
+            if j > 1
+                rhs = rhs - Y(i, 1:j-1) * TB(1:j-1, j)'; % Subtract contributions from previous columns
+            end
+            
+            % Solve for Y(i, j)
+            Y(i, j) = rhs / diag_term;
+        end
+    end
+
+    % Step 4: Recover the solution X
+    X = QA * Y * QB'; % Transform Y back to the original basis: X = QA * Y * QB'
+end
