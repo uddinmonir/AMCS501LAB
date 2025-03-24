@@ -1,0 +1,69 @@
+function [X, residual] = rksm(A, B, C, sigmaA, sigmaB, tol, maxit)
+    % Solves the Sylvester equation AX + XB = C using the Rational Krylov Subspace Method (RKSM).
+    % Inputs:
+    %   A - m x m matrix
+    %   B - n x n matrix
+    %   C - m x n matrix
+    %   sigmaA - Set of poles (shifts) for A
+    %   sigmaB - Set of poles (shifts) for B'
+    %   tol - Tolerance for convergence
+    %   maxit - Maximum number of iterations
+    % Outputs:
+    %   X - Approximate solution matrix
+    %   residual - Final residual norm
+
+    % Initialize variables
+    [m, ~] = size(A);
+    [~, n] = size(B);
+    Vk = []; % Basis for Krylov subspace of A
+    Wl = []; % Basis for Krylov subspace of B'
+    residual = inf;
+    iter = 0;
+
+    % Step 1: Construct rational Krylov subspaces
+    while residual > tol && iter < maxit
+        iter = iter + 1;
+
+        % Build Krylov subspace for A
+        for i = 1:length(sigmaA)
+            sigma = sigmaA(i);
+            if isempty(Vk)
+                v = (A - sigma * eye(m)) \ C(:, 1); % Solve (A - sigmaI)v = C(:,1)
+            else
+                v = (A - sigma * eye(m)) \ C(:, 1) - Vk * (Vk' * ((A - sigma * eye(m)) \ C(:, 1)));
+            end
+            v = v / norm(v); % Normalize
+            Vk = [Vk, v]; % Append to basis
+        end
+
+        % Build Krylov subspace for B'
+        for j = 1:length(sigmaB)
+            mu = sigmaB(j);
+            if isempty(Wl)
+                w = (B' - mu * eye(n)) \ C(1, :)'; % Solve (B' - muI)w = C(1,:)'
+            else
+                w = (B' - mu * eye(n)) \ C(1, :)' - Wl * (Wl' * ((B' - mu * eye(n)) \ C(1, :)'));
+            end
+            w = w / norm(w); % Normalize
+            Wl = [Wl, w]; % Append to basis
+        end
+
+        % Step 2: Project the Sylvester equation
+        Hk = Vk' * A * Vk; % Projection of A
+        Gl = Wl' * B' * Wl; % Projection of B'
+        D = Vk' * C * Wl; % Projection of C
+
+        % Step 3: Solve the reduced Sylvester equation
+        Y = sylvester(Hk, Gl', D); % Solve Hk * Y + Y * Gl' = D
+
+        % Step 4: Recover the approximate solution
+        X = Vk * Y * Wl'; % Approximate solution
+
+        % Step 5: Check residual
+        residual = norm(A * X + X * B - C, 'fro'); % Frobenius norm of the residual
+        fprintf('Iteration %d: Residual = %e\n', iter, residual);
+
+        % Optional: Adjust poles adaptively based on residual
+        % sigmaA and sigmaB can be updated here if needed
+    end
+end
