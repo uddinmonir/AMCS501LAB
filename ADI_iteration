@@ -1,0 +1,53 @@
+function X = ADI_iteration(A, F, mu, imax, tau)
+    % Inputs:
+    % A: Matrix A (n x n)
+    % F: Matrix F (n x m)
+    % mu: Vector of shift parameters {μi} (J x 1)
+    % imax: Maximum number of iterations
+    % tau: Tolerance for convergence
+    
+    % Output:
+    % X: Approximation of the solution matrix X
+
+    % Initialize variables
+    n = size(A, 1); % Size of matrix A
+    J = length(mu); % Number of shift parameters
+    X = zeros(n);   % Initial guess for X (X0 = 0)
+    i = 1;          % Iteration counter
+    FF_T = F * F';  % Precompute F * F^T
+
+    % Compute norm of F * F^T for tolerance check
+    norm_FF_T = norm(FF_T, 'fro'); % Frobenius norm
+
+    while i <= imax
+        % Loop over all shift parameters μi
+        for j = 1:J
+            mu_i = mu(j); % Current shift parameter
+            mu_i_conj = conj(mu_i); % Conjugate of μi
+            
+            % Construct matrices A_mu_i and A_i
+            A_mu_i = (A + mu_i * eye(n)) \ (A - mu_i_conj * eye(n));
+            A_i = (A + mu_i * eye(n));
+            
+            % Update X using the ADI formula
+            X = A_mu_i * X * A_mu_i' - 2 * mu_i * A_i * FF_T * A_i';
+        end
+        
+        % Compute the residual R(X) = AX + XA^T + FF^T
+        R_X = A * X + X * A' + FF_T;
+        
+        % Check convergence criterion
+        if norm(R_X, 'fro') / norm_FF_T < tau
+            fprintf('Converged after %d iterations.\n', i);
+            break;
+        end
+        
+        % Increment iteration counter
+        i = i + 1;
+    end
+
+    % If max iterations reached without convergence
+    if i > imax
+        fprintf('Maximum iterations (%d) reached without convergence.\n', imax);
+    end
+end
